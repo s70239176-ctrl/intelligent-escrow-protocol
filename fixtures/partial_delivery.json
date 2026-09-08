@@ -1,0 +1,7 @@
+{
+  "name": "partial_delivery",
+  "description": "A Seller submission that partially satisfies the criteria -- genuinely subjective territory where reasonable adjudicators could disagree. Not asserted against a fixed expected_decision; used to sanity-check that the contract still resolves to a well-formed terminal state and that chain_of_thought is populated, rather than to assert a specific winner.",
+  "acceptance_criteria": "A complete landing page mockup with a hero section, three feature blocks, and a pricing table.",
+  "deliverable_payload": "ipfs://bafybeicx6nq3z5b5f5c5f5d5f5g5h5i5j5k5l5m5n5o5p5q5r5s5t5u5v5w -- a Figma link showing a hero section and three feature blocks, but the pricing table section is a placeholder gray box labeled 'TODO: pricing'.",
+  "expected_decision": null
+}

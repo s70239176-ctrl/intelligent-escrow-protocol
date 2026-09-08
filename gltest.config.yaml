@@ -1,0 +1,31 @@
+# gltest.config.yaml
+#
+# Configuration for the `gltest` GenLayer test runner. Adjust the
+# `studionet` block to match your actual GenLayer Studio / testnet
+# endpoint and funded deployer credentials before running the
+# integration suite.
+
+default_network: direct
+
+networks:
+  direct:
+    mode: direct
+    description: >
+      In-process Direct Mode execution against a local GenVM simulator.
+      No network calls, no real LLM provider required if your harness
+      supplies mocked gl.nondet.exec_prompt responses. Used by
+      tests/direct/.
+
+  studionet:
+    mode: rpc
+    rpc_url: "${GENLAYER_STUDIONET_RPC_URL}"
+    chain_id: "${GENLAYER_STUDIONET_CHAIN_ID}"
+    deployer_private_key: "${GENLAYER_DEPLOYER_PRIVATE_KEY}"
+    description: >
+      Disposable StudioNet deployment used only by tests/integration/,
+      which performs real (testnet) transactions. Do not point this at
+      mainnet.
+
+test_paths:
+  direct: tests/direct
+  integration: tests/integration

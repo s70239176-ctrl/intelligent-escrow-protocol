@@ -1,0 +1,7 @@
+{
+  "name": "off_brief_delivery",
+  "description": "A Seller submission that does not match the agreed acceptance criteria at all. Used to confirm the adjudicator sides with the Buyer.",
+  "acceptance_criteria": "A 500-word essay explaining how zero-knowledge proofs work, written for a non-technical audience.",
+  "deliverable_payload": "ipfs://bafybeih6f3x2n3s5j6ntq5xkq4b4y5z5b5f5c5f5d5f5g5h5i5j5k5l5m5 -- a link to an unrelated stock photo of a mountain landscape with the caption 'nature is nice'.",
+  "expected_decision": "BUYER"
+}
