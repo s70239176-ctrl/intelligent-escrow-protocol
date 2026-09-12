@@ -34,14 +34,16 @@ one plain-text acceptance criteria string, agreed before delivery:
 Buyer + Seller + amount + acceptance_criteria
               │
               ▼
-     Seller submits payload
+   Seller submits deliverable_locator
+     (a URI or a text description)
               │
        ┌──────┴──────┐
        ▼             ▼
    Buyer approves   Buyer or Seller disputes
    (no LLM)              │
        │                 ▼
-       │        LLM-consensus adjudication
+       │        Contract fetches evidence,
+       │      then LLM-consensus adjudication
        │                 │
        └────────┬────────┘
                 ▼
@@ -57,20 +59,20 @@ contract across unrelated deals.
 ## Lifecycle
 
 ```
-        submit_deliverable(payload)      [caller must be Seller]
-PENDING ─────────────────────────────► DELIVERED
-                                            │  │
-                        approve()           │  │ dispute()
-                    [caller = Buyer]        │  │ [caller = Buyer or Seller]
-                        ┌───────────────────┘  │
-                        ▼                      ▼
-                    RESOLVED               DISPUTED
-                (winner = SELLER)              │
-                                                │ resolve_dispute()
-                                                │ [caller = Buyer or Seller]
-                                                ▼
-                                            RESOLVED
-                                    (winner = SELLER | BUYER)
+   submit_deliverable(deliverable_locator)      [caller must be Seller]
+PENDING ─────────────────────────────────────► DELIVERED
+                                                    │  │
+                        approve()                   │  │ dispute()
+                    [caller = Buyer]                │  │ [caller = Buyer or Seller]
+                        ┌───────────────────────────┘  │
+                        ▼                              ▼
+                    RESOLVED                       DISPUTED
+                (winner = SELLER)                      │
+                                                        │ resolve_dispute()
+                                                        │ [caller = Buyer or Seller]
+                                                        ▼
+                                                    RESOLVED
+                                            (winner = SELLER | BUYER)
 ```
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for field-by-field
@@ -81,10 +83,19 @@ state details and how to extend the state machine.
 Handshake-style primitives on GenLayer earn their trust by being
 explicit about what the model can and cannot influence. For the IEP:
 
-- **Sanitization is independent per validator.** Every validator's own
-  LLM instance sanitizes the Seller's raw payload before it ever sees
-  the acceptance criteria or the decision schema — an attacker can't
-  target "the leader's sanitizer" alone.
+- **Evidence is acquired, not trusted, per validator.** If
+  `deliverable_locator` is a fetchable URI (`http://`, `https://`,
+  `ipfs://`), every validator independently retrieves the actual
+  referenced content via `gl.nondet.web.render(...)` and adjudicates
+  *that*, rather than the Seller's own description of what the link
+  contains. An `ipfs://` locator is normalized to a public gateway URL
+  before retrieval; a failed fetch is replaced with a fixed placeholder
+  that the adjudication prompt is told should favor the Buyer.
+- **Sanitization is independent per validator**, and runs on the
+  *acquired evidence* — fetched content or plain text, whichever it
+  turned out to be — before it ever sees the acceptance criteria or the
+  decision schema. An attacker can't target "the leader's sanitizer" or
+  "the leader's fetch" alone.
 - **Adjudication is independent per validator**, forced into a strict
   two-key JSON schema (`chain_of_thought`, `decision`).
 - **Consensus is keyed on `decision` only.** The contract uses
@@ -100,15 +111,17 @@ Full write-up, including the threat model, is in
 
 ## Security properties
 
-- The Seller's payload is never interpolated directly into the
-  adjudication prompt — only its greybox-sanitized description is.
+- The Seller's `deliverable_locator` is never adjudicated at face value:
+  if it's a URI, the contract fetches the real referenced content;
+  either way, only the greybox-sanitized evidence reaches the
+  adjudication prompt.
 - Every fund-moving method (`approve`, `resolve_dispute`) is gated on
   `gl.message.sender_address`, never a caller-supplied argument.
 - A malformed model response fails the transaction; it never falls back
   to a default winner.
 - `resolve_dispute()` is only reachable from `DISPUTED`, which is only
   reachable from `DELIVERED`, which requires an actual submitted
-  payload — there is no path to adjudicate an empty or missing
+  locator — there is no path to adjudicate an empty or missing
   deliverable.
 - `_release_funds` is a documented no-op left for integrators to wire to
   their own asset layer, so this primitive makes no unaudited claims
@@ -118,7 +131,7 @@ Full write-up, including the threat model, is in
 
 ```
 contracts/escrow.py                     Intelligent Contract
-fixtures/                               Sample acceptance criteria + payloads used in tests
+fixtures/                               Sample acceptance criteria + deliverable locators used in tests
 scripts/local_helper_check.py           Deterministic structural checks without GenVM
 scripts/preflight.py                    Submission invariant checks
 scripts/deploy_studionet.sh             Minimal StudioNet deploy helper
@@ -147,7 +160,8 @@ pytest tests/direct -q
 
 The Direct Mode suite covers state-machine transitions, access control
 on every write method, and a prompt-injection-resistance case built from
-the `prompt_injection_attempt` fixture.
+the `prompt_injection_in_fetched_content` and
+`fabricated_description_contradicted_by_evidence` fixtures.
 
 Disposable StudioNet lifecycle proof (real transactions — run
 intentionally):

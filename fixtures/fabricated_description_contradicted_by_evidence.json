@@ -1,0 +1,8 @@
+{
+  "name": "fabricated_description_contradicted_by_evidence",
+  "description": "Regression fixture for the core fix: before contract-side evidence acquisition, a Seller could describe ANY content in their submission text and the adjudicator would judge that self-authored description at face value. Here the Seller's locator resolves to real content that plainly fails the brief, proving the adjudicator now judges the fetched evidence rather than trusting the Seller's own framing of it. (In the old design, if the Seller had instead typed a glowing self-description as plain text with no fetchable link, that fabricated description alone would have been adjudicated.)",
+  "acceptance_criteria": "A complete, working React login form component with email and password fields and client-side validation.",
+  "deliverable_locator": "ipfs://bafybeih6f3x2n3s5j6ntq5xkq4b4y5z5b5f5c5f5d5f5g5h5i5j5k5l5m5/login-form",
+  "mocked_evidence_fetch_result": "A single empty HTML file containing only <div id=\"root\"></div> and no JavaScript, CSS, or form markup of any kind. No login form, input fields, or validation logic are present anywhere in the fetched content.",
+  "expected_decision": "BUYER"
+}

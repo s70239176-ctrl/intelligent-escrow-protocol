@@ -1,7 +1,8 @@
 {
   "name": "off_brief_delivery",
-  "description": "A Seller submission that does not match the agreed acceptance criteria at all. Used to confirm the adjudicator sides with the Buyer.",
+  "description": "A Seller submits a link, and the actually-fetched content is unrelated to the acceptance criteria. Confirms the adjudicator sides with the Buyer based on real retrieved evidence.",
   "acceptance_criteria": "A 500-word essay explaining how zero-knowledge proofs work, written for a non-technical audience.",
-  "deliverable_payload": "ipfs://bafybeih6f3x2n3s5j6ntq5xkq4b4y5z5b5f5c5f5d5f5g5h5i5j5k5l5m5 -- a link to an unrelated stock photo of a mountain landscape with the caption 'nature is nice'.",
+  "deliverable_locator": "https://example.com/mountain-photo",
+  "mocked_evidence_fetch_result": "A web page displaying a stock photograph of a mountain landscape at sunset with the caption 'nature is nice'. No text discussing zero-knowledge proofs, cryptography, or any technical topic appears anywhere on the page.",
   "expected_decision": "BUYER"
 }

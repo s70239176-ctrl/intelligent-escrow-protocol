@@ -16,7 +16,7 @@ backend service, no external dependencies beyond the GenLayer SDK.
 | --- | --- |
 | The contract itself | [`contracts/escrow.py`](contracts/escrow.py) |
 | The state machine | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |
-| The equivalence design + prompt-injection defense | [`docs/CONSENSUS.md`](docs/CONSENSUS.md) |
+| The evidence acquisition + equivalence design + prompt-injection defense | [`docs/CONSENSUS.md`](docs/CONSENSUS.md) |
 | Test cases, including adversarial ones | [`tests/direct/test_escrow.py`](tests/direct/test_escrow.py) |
 | Sample inputs used across tests | [`fixtures/`](fixtures/) |
 
@@ -46,21 +46,39 @@ gltest --network studionet tests/integration/test_escrow_studionet.py -s
 
 ## Architectural patterns this submission specifically demonstrates
 
-1. **Equivalence design** — the adjudication step never lets consensus
+1. **Evidence acquisition and normalization** — the Seller's
+   `deliverable_locator` is never adjudicated at face value. If it's a
+   fetchable URI (`http://`, `https://`, `ipfs://`), the contract
+   retrieves the actual referenced content via `gl.nondet.web.render`
+   (with `ipfs://` normalized to a public gateway URL first) and
+   adjudicates *that*, not the Seller's description of it. A failed
+   fetch is replaced with a fixed placeholder rather than silently
+   trusting the Seller. See `docs/CONSENSUS.md` and the
+   `fabricated_description_contradicted_by_evidence` fixture.
+2. **Equivalence design** — the adjudication step never lets consensus
    depend on freeform LLM text. It forces a strict two-key JSON schema
    and reaches agreement via `gl.eq_principle.prompt_comparative` keyed
    explicitly on the `decision` field, ignoring `chain_of_thought`
    wording differences between validators. See `docs/CONSENSUS.md`.
-2. **Greybox sanitization** — the Seller's untrusted payload is never
-   interpolated directly into the adjudication prompt. It first passes
-   through an isolated `gl.nondet.exec_prompt` call that has zero
-   knowledge of the acceptance criteria or decision schema, so it has no
-   meaningful decision to leak even if fully compromised by injected
-   text. See `docs/CONSENSUS.md` and the `prompt_injection_attempt`
+3. **Greybox sanitization** — whichever evidence acquisition produced
+   (fetched content or plain text) is never interpolated directly into
+   the adjudication prompt. It first passes through an isolated
+   `gl.nondet.exec_prompt` call that has zero knowledge of the
+   acceptance criteria or decision schema, so it has no meaningful
+   decision to leak even if fully compromised by injected text. See
+   `docs/CONSENSUS.md` and the `prompt_injection_in_fetched_content`
    fixture in `fixtures/`.
 
 ## Known limitations / explicitly out of scope
 
+- `gl.nondet.web.render(..., mode="text")` retrieves text-mode content.
+  For a fundamentally visual deliverable (an SVG's rendered appearance,
+  a PNG mockup), this fetches the underlying markup or surrounding page
+  text, not a rendered visual judgment of the image -- a meaningfully
+  closer approximation of the real deliverable than trusting an
+  unverified Seller description, but not equivalent to a human or
+  vision-capable model looking at the artwork itself. See "Known
+  residual limitation" in `docs/CONSENSUS.md`.
 - `_release_funds` in `contracts/escrow.py` is a documented no-op. This
   primitive is deliberately asset-agnostic; wiring it to a specific
   token/transfer mechanism is left to integrators.

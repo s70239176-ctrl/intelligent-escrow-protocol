@@ -33,7 +33,7 @@ REQUIRED_FIXTURE_KEYS = {
     "name",
     "description",
     "acceptance_criteria",
-    "deliverable_payload",
+    "deliverable_locator",
     "expected_decision",
 }
 

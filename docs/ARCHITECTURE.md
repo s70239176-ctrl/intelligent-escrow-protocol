@@ -44,7 +44,7 @@ cannot be skipped or re-entered out of order.
 | `seller` | `Address` | Party expected to deliver the work. |
 | `amount` | `u256` | Escrowed amount. |
 | `acceptance_criteria` | `str` | Plain-text brief agreed on before delivery. Immutable after construction. |
-| `deliverable_payload` | `str` | Set once, by the Seller, via `submit_deliverable`. |
+| `deliverable_locator` | `str` | Set once, by the Seller, via `submit_deliverable`. Either a fetchable URI (`http://`, `https://`, `ipfs://`) or freeform text; never trusted at face value -- see `docs/CONSENSUS.md` for how it's resolved into evidence at adjudication time. |
 | `status` | `str` | One of `PENDING`, `DELIVERED`, `DISPUTED`, `RESOLVED`. |
 | `winner` | `str` | `""` until resolution; then `"SELLER"` or `"BUYER"`. |
 | `resolution_reasoning` | `str` | Human-readable justification -- either a fixed string for manual approval, or the adjudicator's `chain_of_thought` for a disputed resolution. |

@@ -1,7 +1,8 @@
 {
   "name": "clean_delivery",
-  "description": "A Seller submission that clearly satisfies the acceptance criteria. Used to exercise the happy path and to confirm the adjudicator sides with the Seller when a dispute is opened anyway.",
-  "acceptance_criteria": "A vector graphic of a cyberpunk cat, delivered as an SVG or PDF file.",
-  "deliverable_payload": "ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi/cyberpunk_cat.svg -- a hand-drawn SVG depicting a neon-lit cat with cybernetic ear implants and a glowing collar, rendered in a cyberpunk color palette (magenta, cyan, deep purple).",
+  "description": "A Seller submits an IPFS link whose actually-fetched content genuinely matches the acceptance criteria. Exercises the happy path where retrieved evidence supports the Seller.",
+  "acceptance_criteria": "A vector graphic of a cyberpunk cat, delivered as an SVG file.",
+  "deliverable_locator": "ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi/cyberpunk_cat.svg",
+  "mocked_evidence_fetch_result": "<svg viewBox='0 0 512 512'>... a rendered vector illustration of a cat with neon-magenta cybernetic ear implants, a glowing cyan collar, and a deep-purple background typical of cyberpunk artwork ...</svg>",
   "expected_decision": "SELLER"
 }

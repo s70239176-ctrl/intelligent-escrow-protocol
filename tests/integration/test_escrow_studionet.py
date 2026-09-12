@@ -35,7 +35,7 @@ def test_full_lifecycle_happy_path(studionet_client):
     )
 
     studionet_client.as_account(studionet_client.accounts.seller).call(
-        escrow, "submit_deliverable", payload="ipfs://Qm.../cat.svg"
+        escrow, "submit_deliverable", deliverable_locator="ipfs://Qm.../cat.svg"
     )
     studionet_client.as_account(studionet_client.accounts.buyer).call(escrow, "approve")
 
@@ -62,7 +62,7 @@ def test_full_lifecycle_disputed_path(studionet_client):
     )
 
     studionet_client.as_account(studionet_client.accounts.seller).call(
-        escrow, "submit_deliverable", payload="ipfs://Qm.../unrelated_photo.jpg"
+        escrow, "submit_deliverable", deliverable_locator="ipfs://Qm.../unrelated_photo.jpg"
     )
     studionet_client.as_account(studionet_client.accounts.buyer).call(escrow, "dispute")
     studionet_client.as_account(studionet_client.accounts.buyer).call(escrow, "resolve_dispute")
