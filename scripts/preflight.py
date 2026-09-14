@@ -28,6 +28,7 @@ REQUIRED_FILES = [
     "contracts/escrow.py",
     "docs/ARCHITECTURE.md",
     "docs/CONSENSUS.md",
+    "docs/CUSTODY.md",
     "tests/direct/test_escrow.py",
     "scripts/local_helper_check.py",
     "scripts/deploy_studionet.sh",
@@ -37,6 +38,7 @@ REQUIRED_README_SECTIONS = [
     "consensus actually does",
     "greybox-sanitized",
     "Repository layout",
+    "Custody and settlement",
 ]
 
 DISALLOWED_PATTERNS = ["__pycache__", ".pyc", ".DS_Store"]

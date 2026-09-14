@@ -7,6 +7,8 @@ Escrow answers a question ordinary smart contracts cannot:
 
 It is a **standalone Intelligent Contract primitive**, not a product application. There is intentionally **no frontend and no backend service**. Marketplaces, freelance platforms, bounty boards, and other Intelligent Contracts can consume its escrow state directly.
 
+> **Before deploying with real value:** read [`docs/CUSTODY.md`](docs/CUSTODY.md). This contract holds and pays out real GEN, but there is a confirmed, currently-open GenLayer platform issue that can affect whether payouts actually land on some networks. The decision-making logic (who wins a dispute) is independently verifiable today; the fund-movement step needs to be checked against your target network.
+
 ## Why this exists
 
 Traditional smart-contract escrow only works for objectively verifiable
@@ -27,28 +29,40 @@ case where Buyer and Seller simply agree.
 
 ## Core primitive
 
-A single escrow instance tracks one Buyer, one Seller, one amount, and
-one plain-text acceptance criteria string, agreed before delivery:
+A single escrow instance tracks one Buyer, one Seller, a required
+amount, a plain-text acceptance criteria string agreed before delivery,
+and a delivery window:
 
 ```
-Buyer + Seller + amount + acceptance_criteria
+Buyer + Seller + amount + acceptance_criteria + delivery_window_seconds
               │
               ▼
-   Seller submits deliverable_locator
-     (a URI or a text description)
+     Buyer calls fund() with exactly `amount` in GEN
+     (starts the delivery-window clock)
               │
-       ┌──────┴──────┐
-       ▼             ▼
-   Buyer approves   Buyer or Seller disputes
-   (no LLM)              │
-       │                 ▼
-       │        Contract fetches evidence,
-       │      then LLM-consensus adjudication
-       │                 │
-       └────────┬────────┘
-                ▼
-         funds released to
-         SELLER or BUYER
+       ┌──────┴──────────────────────┐
+       ▼                              ▼
+Seller submits deliverable_locator   Deadline passes,
+(a URI or a text description)         still no delivery
+       │                              │
+       │                              ▼
+       │                    either party calls
+       │                    claim_timeout_refund()
+       │                    → funds back to Buyer
+       │
+ ┌─────┴─────┐
+ ▼           ▼
+Buyer      Buyer or Seller
+approves   disputes
+(no LLM)       │
+   │           ▼
+   │  Contract fetches evidence,
+   │  then LLM-consensus adjudication
+   │           │
+   └─────┬─────┘
+         ▼
+  funds released to
+  SELLER or BUYER
 ```
 
 Each escrow is a single deployed contract instance — this primitive is
@@ -59,24 +73,53 @@ contract across unrelated deals.
 ## Lifecycle
 
 ```
-   submit_deliverable(deliverable_locator)      [caller must be Seller]
-PENDING ─────────────────────────────────────► DELIVERED
-                                                    │  │
-                        approve()                   │  │ dispute()
-                    [caller = Buyer]                │  │ [caller = Buyer or Seller]
-                        ┌───────────────────────────┘  │
-                        ▼                              ▼
-                    RESOLVED                       DISPUTED
-                (winner = SELLER)                      │
-                                                        │ resolve_dispute()
-                                                        │ [caller = Buyer or Seller]
-                                                        ▼
-                                                    RESOLVED
-                                            (winner = SELLER | BUYER)
+   fund()               submit_deliverable(deliverable_locator)
+[caller = Buyer]              [caller must be Seller]
+     │                              │
+     ▼                              ▼
+PENDING (unfunded) ──► PENDING (funded) ─────────────► DELIVERED
+                              │                            │  │
+              claim_timeout_refund()      approve()        │  │ dispute()
+              [after deadline]           [caller = Buyer]  │  │ [caller = Buyer or Seller]
+                              │                  ┌──────────┘  │
+                              ▼                  ▼             ▼
+                          REFUNDED           RESOLVED      DISPUTED
+                      (funds → Buyer)    (winner = SELLER)     │
+                                                                │ resolve_dispute()
+                                                                ▼
+                                                            RESOLVED
+                                                    (winner = SELLER | BUYER,
+                                                     funds → winner)
 ```
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for field-by-field
-state details and how to extend the state machine.
+state details, and [`docs/CUSTODY.md`](docs/CUSTODY.md) for exactly how
+`fund()` / `claim_timeout_refund()` / payouts work.
+
+## Custody and settlement
+
+Unlike a purely deterministic escrow, this contract actually holds
+funds and pays them out — it isn't a stub:
+
+- **Funding is explicit and separate from deployment.** The Buyer calls
+  `fund()` — a `@gl.public.write.payable` method — sending exactly the
+  agreed `amount`. `submit_deliverable()` requires this to have
+  happened first.
+- **All three settlement paths share one internal `_pay_out()`**, which
+  transfers GEN via `gl.ContractAt(recipient).emit_transfer(value=...)`
+  (GenLayer's documented native-token transfer pattern) and sets
+  `funds_released = True` so a given escrow can only pay out once.
+- **Non-delivery does not lock funds forever.** If the Seller never
+  submits before `delivery_deadline` (computed from
+  `delivery_window_seconds` at funding time, using the consensus
+  transaction timestamp `gl.message.datetime`, not a per-validator wall
+  clock), either party can call `claim_timeout_refund()` to return
+  funds to the Buyer.
+- **A known risk affects the transfer step specifically.** See
+  [`docs/CUSTODY.md`](docs/CUSTODY.md) for a filed GenLayer platform
+  issue that can prevent `emit_transfer` payouts from actually landing
+  on some networks, and how to verify this on yours before relying on
+  it.
 
 ## What consensus actually does
 
@@ -115,17 +158,23 @@ Full write-up, including the threat model, is in
   if it's a URI, the contract fetches the real referenced content;
   either way, only the greybox-sanitized evidence reaches the
   adjudication prompt.
-- Every fund-moving method (`approve`, `resolve_dispute`) is gated on
-  `gl.message.sender_address`, never a caller-supplied argument.
+- Every fund-moving method (`fund`, `approve`, `resolve_dispute`,
+  `claim_timeout_refund`) is gated on `gl.message.sender_address`,
+  never a caller-supplied argument.
+- `fund()` requires `gl.message.value` to exactly match the agreed
+  `amount`; a mismatch reverts the call, and a reverted payable call
+  does not transfer value.
+- `funds_released` blocks every settlement path from paying out twice,
+  independent of the status-based state machine guards.
 - A malformed model response fails the transaction; it never falls back
   to a default winner.
 - `resolve_dispute()` is only reachable from `DISPUTED`, which is only
   reachable from `DELIVERED`, which requires an actual submitted
   locator — there is no path to adjudicate an empty or missing
   deliverable.
-- `_release_funds` is a documented no-op left for integrators to wire to
-  their own asset layer, so this primitive makes no unaudited claims
-  about a specific token mechanism.
+- `claim_timeout_refund()` prevents funds from being locked forever by
+  Seller non-delivery; see `docs/ARCHITECTURE.md` for which other
+  stuck-state scenarios are and aren't covered, and why.
 
 ## Repository layout
 
@@ -134,11 +183,12 @@ contracts/escrow.py                     Intelligent Contract
 fixtures/                               Sample acceptance criteria + deliverable locators used in tests
 scripts/local_helper_check.py           Deterministic structural checks without GenVM
 scripts/preflight.py                    Submission invariant checks
-scripts/deploy_studionet.sh             Minimal StudioNet deploy helper
-tests/direct/                           Direct Mode state-machine + prompt-injection tests
-tests/integration/                      Disposable StudioNet lifecycle proof
+scripts/deploy_studionet.sh             Minimal StudioNet deploy + fund helper
+tests/direct/                           Direct Mode state-machine + custody-gating + prompt-injection tests
+tests/integration/                      Disposable StudioNet lifecycle proof, including real balance checks
 docs/ARCHITECTURE.md                    State machine and extension points
 docs/CONSENSUS.md                       Equivalence design, greybox sanitization, threat model
+docs/CUSTODY.md                         Fund custody, settlement, and a known platform-level risk
 SUBMISSION.md                           Reviewer-oriented submission notes
 ```
 
@@ -158,13 +208,17 @@ python -m pip install -r requirements-test.txt
 pytest tests/direct -q
 ```
 
-The Direct Mode suite covers state-machine transitions, access control
-on every write method, and a prompt-injection-resistance case built from
-the `prompt_injection_in_fetched_content` and
-`fabricated_description_contradicted_by_evidence` fixtures.
+The Direct Mode suite covers state-machine transitions, funding/access
+control gating on every write method, the timeout-refund path, and
+prompt-injection-resistance cases built from the
+`prompt_injection_in_fetched_content` and
+`fabricated_description_contradicted_by_evidence` fixtures. **Direct
+Mode does not simulate real value transfer** — it verifies the custody
+*gating logic*, not that GEN actually moves. See
+[`docs/CUSTODY.md`](docs/CUSTODY.md).
 
-Disposable StudioNet lifecycle proof (real transactions — run
-intentionally):
+Disposable StudioNet lifecycle proof (real transactions, including real
+balance assertions — run intentionally):
 
 ```bash
 gltest --network studionet tests/integration/test_escrow_studionet.py -s
@@ -177,10 +231,10 @@ genlayer network set studionet
 genlayer deploy --contract contracts/escrow.py
 ```
 
-Or use the helper script:
+Or use the helper script, which also prints the follow-up `fund` step:
 
 ```bash
-./scripts/deploy_studionet.sh <buyer_address> <seller_address> <amount> "<acceptance_criteria>"
+./scripts/deploy_studionet.sh <buyer_address> <seller_address> <amount> <delivery_window_seconds> "<acceptance_criteria>"
 ```
 
 Deploy args:
@@ -189,10 +243,16 @@ Deploy args:
 | --- | --- | --- |
 | `buyer` | string (address) | `0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266` |
 | `seller` | string (address) | `0x70997970C51812dc3A010C7d01b50e0d17dc79C8` |
-| `amount` | int | `100` |
+| `amount` | int (wei) | `100` |
 | `acceptance_criteria` | string | `A vector graphic of a cyberpunk cat` |
+| `delivery_window_seconds` | int | `604800` (7 days) |
 
-Record the deployed contract address and transaction hash in
+**Deployment does not fund the escrow.** After deploying, the Buyer must
+separately call `fund()` sending exactly `amount` in GEN before the
+Seller can submit a deliverable.
+
+Record the deployed contract address, transaction hash, and (once
+verified) the actual observed balance change in
 [`SUBMISSION.md`](SUBMISSION.md).
 
 ## Why this is a primitive, not an app

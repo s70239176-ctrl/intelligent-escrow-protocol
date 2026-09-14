@@ -37,7 +37,7 @@ REQUIRED_FIXTURE_KEYS = {
     "expected_decision",
 }
 
-STATUS_CONSTANTS = {"PENDING", "DELIVERED", "DISPUTED", "RESOLVED"}
+STATUS_CONSTANTS = {"PENDING", "DELIVERED", "DISPUTED", "RESOLVED", "REFUNDED"}
 
 
 def check_contract_parses() -> None:
