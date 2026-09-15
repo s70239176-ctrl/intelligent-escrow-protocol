@@ -104,7 +104,7 @@ class IntelligentEscrowProtocol(gl.Contract):
             )
 
         self.funded = True
-        now = datetime.datetime.fromisoformat(gl.message.datetime)
+        now = datetime.datetime.fromisoformat(gl.message_raw["datetime"].replace("Z", "+00:00"))
         deadline = now + datetime.timedelta(seconds=int(self.delivery_window_seconds))
         self.delivery_deadline = deadline.isoformat()
 
@@ -156,7 +156,7 @@ class IntelligentEscrowProtocol(gl.Contract):
         if not self.funded:
             raise gl.vm.UserError("Escrow was never funded; nothing to refund.")
 
-        now = datetime.datetime.fromisoformat(gl.message.datetime)
+        now = datetime.datetime.fromisoformat(gl.message_raw["datetime"].replace("Z", "+00:00"))
         deadline = datetime.datetime.fromisoformat(self.delivery_deadline)
         if now < deadline:
             raise gl.vm.UserError("The delivery deadline has not passed yet.")
@@ -353,7 +353,7 @@ affect equivalence.
             raise gl.vm.UserError("Escrow was never funded; nothing to release.")
 
         self.funds_released = True
-        gl.ContractAt(recipient).emit_transfer(value=self.amount)
+        gl.get_contract_at(recipient).emit_transfer(value=self.amount)
 
     # -----------------------------------------------------------------
     # Read-only views
